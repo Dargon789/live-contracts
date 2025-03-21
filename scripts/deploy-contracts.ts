@@ -8,6 +8,7 @@ import { MIGRATOR_TO_DUO_V1 } from './artifacts/SEQ0001/v1/MigratorToDuo'
 import { MAIN_MODULE_UPGRADABLE_DUO_V2 } from './artifacts/SEQ0001/v2/MainModuleUpgradableDuo'
 import { MIGRATOR_TO_DUO_V2 } from './artifacts/SEQ0001/v2/MigratorToDuo'
 import { type Config, perConfig } from './config'
+import { BatchPayableHelper } from './factories/marketplace/BatchPayableHelper'
 import { NiftyswapExchange20Wrapper } from './factories/marketplace/NiftyswapExchange20Wrapper'
 import { NIFTYSWAP_FACTORY_20_DEFAULT_ADMIN, NiftyswapFactory20 } from './factories/marketplace/NiftyswapFactory20'
 import { SequenceMarketFactoryV2 } from './factories/marketplace/SequenceMarketFactoryV2'
@@ -17,10 +18,13 @@ import { ClawbackMetadata } from './factories/token_library/ClawbackMetadata'
 import { ERC1155ItemsFactory } from './factories/token_library/ERC1155ItemsFactory'
 import { ERC1155SaleFactory } from './factories/token_library/ERC1155SaleFactory'
 import { ERC1155SoulboundFactory } from './factories/token_library/ERC1155SoulboundFactory'
+import { ERC1155PackFactory } from './factories/token_library/ERC1155PackFactory'
 import { ERC20ItemsFactory } from './factories/token_library/ERC20ItemsFactory'
 import { ERC721ItemsFactory } from './factories/token_library/ERC721ItemsFactory'
 import { ERC721SaleFactory } from './factories/token_library/ERC721SaleFactory'
 import { ERC721SoulboundFactory } from './factories/token_library/ERC721SoulboundFactory'
+import { ERC1155OperatorEnforcedFactory } from './factories/token_library/immutable/ERC1155OperatorEnforcedFactory'
+import { ERC721OperatorEnforcedFactory } from './factories/token_library/immutable/ERC721OperatorEnforcedFactory'
 import { PaymentCombiner } from './factories/token_library/PaymentCombiner'
 import { PaymentsFactory } from './factories/token_library/PaymentsFactory'
 import {
@@ -33,6 +37,7 @@ import {
 } from './factories/v1'
 import { FactoryV2, GuestModuleV2, MainModuleUpgradableV2, MainModuleV2, SequenceUtilsV2, TrustFactory } from './factories/v2'
 import { WALLET_CREATION_CODE } from './factories/v2/FactoryV2'
+import { WalletProxyHook } from './factories/v2/hooks/WalletProxyHook'
 import type { ContractEntry, SequenceEnvironment } from './types'
 import { getArtifactFactory } from './utils'
 import { LoggingProvider } from './utils/LoggingProvider'
@@ -82,6 +87,11 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
     prompt.info(`Gas limit (used): ${txParams.gasLimit ?? 'auto'}`)
     prompt.info(`Local Deployer Address: ${await signer.getAddress()}`)
     prompt.info(`Local Deployer Balance: ${await signer.getBalance()}`)
+
+    if ((await signer.getTransactionCount('pending')) !== (await signer.getTransactionCount())) {
+      prompt.fail('Signer has pending transactions, aborting')
+      return 'Signer has pending transactions'
+    }
 
     const universalDeployer = new deployers.UniversalDeployer(signer, prompt) //, undefined, BigNumber.from('35000000000000000'))
     const singletonDeployer = new deployers.SingletonDeployer(signer, prompt) //, undefined, BigNumber.from('30000000000000000'))
@@ -266,6 +276,14 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
 
     prompt.succeed('Deployed V2 commons contracts\n')
 
+    let walletProxyHookAddress: string | undefined
+    if (config.immutableFactories) {
+      prompt.start('Deploying V2 hooks contracts\n')
+      // This hook is only relevant for immutable networks
+      walletProxyHookAddress = (await singletonDeployer.deploy('WalletProxyHook', WalletProxyHook, 0, txParams)).address
+      prompt.succeed('Deployed V2 hooks contracts\n')
+    }
+
     // Sequence development multisig
 
     prompt.start('Deploying Sequence development multisig\n')
@@ -344,6 +362,7 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
       await marketV2DeployTx.wait()
     }
     prompt.log(`SequenceMarketV2 deployed at ${marketV2Address}\n`)
+    const batchPayableHelper = await singletonDeployer.deploy('BatchPayableHelper', BatchPayableHelper, 0, txParams)
     prompt.succeed('Deployed Market contracts\n')
 
     // Contracts library
@@ -398,6 +417,26 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
       txParams,
       developerMultisig.address
     )
+    let erc721OperatorEnforcedFactoryAddress: string | undefined
+    let erc1155OperatorEnforcedFactoryAddress: string | undefined
+    if (config.immutableFactories) {
+      const immutableERC721Factory = await singletonDeployer.deploy(
+        'ERC721OperatorEnforcedFactory',
+        ERC721OperatorEnforcedFactory,
+        0,
+        txParams,
+        developerMultisig.address
+      )
+      erc721OperatorEnforcedFactoryAddress = immutableERC721Factory.address
+      const erc1155OperatorEnforcedFactory = await singletonDeployer.deploy(
+        'ERC1155OperatorEnforcedFactory',
+        ERC1155OperatorEnforcedFactory,
+        0,
+        txParams,
+        developerMultisig.address
+      )
+      erc1155OperatorEnforcedFactoryAddress = erc1155OperatorEnforcedFactory.address
+    }
     const clawbackMetadata = await singletonDeployer.deploy('ClawbackMetadata', ClawbackMetadata, 0, txParams)
     const clawback = await singletonDeployer.deploy(
       'Clawback',
@@ -407,6 +446,14 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
       developerMultisig.address,
       clawbackMetadata.address
     )
+    const erc1155PackFactory = await singletonDeployer.deploy(
+      'ERC1155PackFactory',
+      ERC1155PackFactory,
+      0,
+      txParams,
+      developerMultisig.address
+    )
+
     prompt.succeed('Deployed Library contracts\n')
 
     // Output addresses
@@ -419,6 +466,7 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
       GuestModuleV2: walletContextAddrs.GuestModuleV2,
       SequenceUtilsV2: walletContextAddrs.SequenceUtilsV2,
       TrustFactory: trustFactory.address,
+      WalletProxyHook: walletProxyHookAddress,
       WalletFactoryV1: walletContextAddrs.WalletFactoryV1,
       MainModuleV1: walletContextAddrs.MainModuleV1,
       MainModuleUpgradableV1: walletContextAddrs.MainModuleUpgradableV1,
@@ -435,6 +483,7 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
       SequenceMarketFactoryV2: marketFactoryV2.address,
       SequenceMarketV2: marketV2Address,
       SequenceMarketV1: marketV1.address,
+      BatchPayableHelper: batchPayableHelper.address,
       ERC20ItemsFactory: erc20ItemsFactory.address,
       ERC721ItemsFactory: erc721ItemsFactory.address,
       ERC1155ItemsFactory: erc1155ItemsFactory.address,
@@ -442,10 +491,13 @@ export const deployContracts = async (config: Config): Promise<string | null> =>
       ERC1155SaleFactory: erc1155SaleFactory.address,
       ERC721SoulboundFactory: erc721SoulboundFactory.address,
       ERC1155SoulboundFactory: erc1155SoulboundFactory.address,
+      ERC721OperatorEnforcedFactory: erc721OperatorEnforcedFactoryAddress,
+      ERC1155OperatorEnforcedFactory: erc1155OperatorEnforcedFactoryAddress,
       Clawback: clawback.address,
       ClawbackMetadata: clawbackMetadata.address,
       PaymentCombiner: paymentCombiner.address,
-      PaymentsFactory: paymentsFactory.address
+      PaymentsFactory: paymentsFactory.address,
+      ERC1155PackFactory: erc1155PackFactory.address
     }
     for (const { env, signerAddr, paymentsAddr } of paymentsDeployments) {
       contractEntries[`SequencePaymentsSigner-${env}`] = signerAddr

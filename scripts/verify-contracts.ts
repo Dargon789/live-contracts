@@ -5,6 +5,7 @@ import { readFile } from 'fs/promises'
 import { argv } from 'node:process'
 import ora, { type Ora } from 'ora'
 import { type Config, perConfig } from './config'
+import { BATCHPAYABLEHELPER_VERIFICATION } from './factories/marketplace/BatchPayableHelper'
 import { NIFTYSWAP_EXCHANGE_20_WRAPPER_VERIFICATION } from './factories/marketplace/NiftyswapExchange20Wrapper'
 import { NIFTYSWAP_FACTORY_20_DEFAULT_ADMIN, NIFTYSWAP_FACTORY_20_VERIFICATION } from './factories/marketplace/NiftyswapFactory20'
 import {
@@ -18,6 +19,7 @@ import { CLAWBACKMETADATA_VERIFICATION } from './factories/token_library/Clawbac
 import { ERC1155ItemsFactory, ERC1155ITEMSFACTORY_VERIFICATION } from './factories/token_library/ERC1155ItemsFactory'
 import { ERC1155SaleFactory, ERC1155SALEFACTORY_VERIFICATION } from './factories/token_library/ERC1155SaleFactory'
 import { ERC1155SoulboundFactory, ERC1155SOULBOUNDFACTORY_VERIFICATION } from './factories/token_library/ERC1155SoulboundFactory'
+import { ERC1155PackFactory, ERC1155PACKFACTORY_VERIFICATION } from './factories/token_library/ERC1155PackFactory'
 import { ERC20ItemsFactory, ERC20ITEMSFACTORY_VERIFICATION } from './factories/token_library/ERC20ItemsFactory'
 import { ERC721ItemsFactory, ERC721ITEMSFACTORY_VERIFICATION } from './factories/token_library/ERC721ItemsFactory'
 import { ERC721SaleFactory, ERC721SALEFACTORY_VERIFICATION } from './factories/token_library/ERC721SaleFactory'
@@ -25,6 +27,14 @@ import { ERC721SoulboundFactory, ERC721SOULBOUNDFACTORY_VERIFICATION } from './f
 import { PaymentCombiner, PAYMENTCOMBINER_VERIFICATION } from './factories/token_library/PaymentCombiner'
 import { PAYMENTS_FACTORY_VERIFICATION, PaymentsFactory } from './factories/token_library/PaymentsFactory'
 import { UpgradeableBeacon, UPGRADEABLEBEACON_VERIFICATION } from './factories/token_library/UpgradeableBeacon'
+import {
+  ERC1155OperatorEnforcedFactory,
+  ERC1155OPERATORENFORCEDFACTORY_VERIFICATION
+} from './factories/token_library/immutable/ERC1155OperatorEnforcedFactory'
+import {
+  ERC721OperatorEnforcedFactory,
+  ERC721OPERATORENFORCEDFACTORY_VERIFICATION
+} from './factories/token_library/immutable/ERC721OperatorEnforcedFactory'
 import { FACTORY_V1_VERIFICATION } from './factories/v1/FactoryV1'
 import { GUEST_MODULE_V1_VERIFICATION } from './factories/v1/GuestModuleV1'
 import { MAIN_MODULE_UPGRADABLE_V1_VERIFICATION } from './factories/v1/MainModuleUpgradableV1'
@@ -37,6 +47,7 @@ import { MAIN_MODULE_UPGRADABLE_V2_VERIFICATION } from './factories/v2/MainModul
 import { MAIN_MODULE_V2_VERIFICATION } from './factories/v2/MainModuleV2'
 import { SEQUENCE_UTILS_V2_VERIFICATION } from './factories/v2/SequenceUtilsV2'
 import { TRUST_FACTORY_VERIFICATION } from './factories/v2/commons/TrustFactory'
+import { WALLETPROXYHOOK_VERIFICATION } from './factories/v2/hooks/WalletProxyHook'
 import type { ContractEntry, VerificationRequest } from './types'
 
 export const verifyContracts = async (config: Config, walletContextAddrs: ContractEntry): Promise<string | null> => {
@@ -157,6 +168,14 @@ export const verifyContracts = async (config: Config, walletContextAddrs: Contra
 
     prompt.succeed('Verified V2 commons contracts\n')
 
+    // v2 hooks
+
+    prompt.start('Verifying V2 hooks contracts\n')
+
+    await verifyContract(walletContextAddrs.WalletProxyHook, { ...WALLETPROXYHOOK_VERIFICATION, waitForSuccess })
+
+    prompt.succeed('Verified V2 hooks contracts\n')
+
     // Payments
 
     prompt.start('Verifying Payments contracts\n')
@@ -234,6 +253,10 @@ export const verifyContracts = async (config: Config, walletContextAddrs: Contra
         )
       })
     }
+    await verifyContract(walletContextAddrs.BatchPayableHelper, {
+      ...BATCHPAYABLEHELPER_VERIFICATION,
+      waitForSuccess
+    })
     prompt.succeed('Verified Market contracts\n')
 
     // Library contracts
@@ -272,6 +295,21 @@ export const verifyContracts = async (config: Config, walletContextAddrs: Contra
     })
     await verifyContract(walletContextAddrs.ERC1155SoulboundFactory, {
       ...ERC1155SOULBOUNDFACTORY_VERIFICATION,
+      waitForSuccess,
+      constructorArgs: defaultAbiCoder.encode(['address'], [walletContextAddrs.DeveloperMultisig])
+    })
+    await verifyContract(walletContextAddrs.ERC721OperatorEnforcedFactory, {
+      ...ERC721OPERATORENFORCEDFACTORY_VERIFICATION,
+      waitForSuccess,
+      constructorArgs: defaultAbiCoder.encode(['address'], [walletContextAddrs.DeveloperMultisig])
+    })
+    await verifyContract(walletContextAddrs.ERC1155OperatorEnforcedFactory, {
+      ...ERC1155OPERATORENFORCEDFACTORY_VERIFICATION,
+      waitForSuccess,
+      constructorArgs: defaultAbiCoder.encode(['address'], [walletContextAddrs.DeveloperMultisig])
+    })
+    await verifyContract(walletContextAddrs.ERC1155PackFactory, {
+      ...ERC1155PACKFACTORY_VERIFICATION,
       waitForSuccess,
       constructorArgs: defaultAbiCoder.encode(['address'], [walletContextAddrs.DeveloperMultisig])
     })
@@ -364,6 +402,47 @@ export const verifyContracts = async (config: Config, walletContextAddrs: Contra
       await verifyContract(erc1155SoulboundImplementation, {
         ...ERC1155SOULBOUNDFACTORY_VERIFICATION,
         contractToVerify: 'src/tokens/ERC1155/presets/soulbound/ERC1155Soulbound.sol:ERC1155Soulbound',
+        waitForSuccess
+      })
+    }
+    if (provider && walletContextAddrs.ERC1155PackFactory) {
+      const erc1155PackFactory = new ERC1155PackFactory().attach(walletContextAddrs.ERC1155PackFactory).connect(provider)
+      const erc1155PackBeacon = await erc1155PackFactory.beacon()
+      const erc1155PackImplementation = await beacon.attach(erc1155PackBeacon).connect(provider).implementation()
+      await verifyContract(erc1155PackImplementation, {
+        ...ERC1155PACKFACTORY_VERIFICATION,
+        contractToVerify: 'src/tokens/ERC1155/presets/pack/ERC1155Pack.sol:ERC1155Pack',
+        waitForSuccess
+      })
+    }
+    if (provider && walletContextAddrs.ERC721OperatorEnforcedFactory) {
+      const erc721OperatorEnforcedFactory = new ERC721OperatorEnforcedFactory()
+        .attach(walletContextAddrs.ERC721OperatorEnforcedFactory)
+        .connect(provider)
+      const erc721OperatorEnforcedBeacon = await erc721OperatorEnforcedFactory.beacon()
+      const erc721OperatorEnforcedImplementation = await beacon
+        .attach(erc721OperatorEnforcedBeacon)
+        .connect(provider)
+        .implementation()
+      console.log('erc721OperatorEnforcedImplementation', erc721OperatorEnforcedImplementation)
+      await verifyContract(erc721OperatorEnforcedImplementation, {
+        ...ERC721OPERATORENFORCEDFACTORY_VERIFICATION,
+        contractToVerify: 'src/tokens/ERC721/presets/operator-enforced/ERC721OperatorEnforced.sol:ERC721OperatorEnforced',
+        waitForSuccess
+      })
+    }
+    if (provider && walletContextAddrs.ERC1155OperatorEnforcedFactory) {
+      const erc1155OperatorEnforcedFactory = new ERC1155OperatorEnforcedFactory()
+        .attach(walletContextAddrs.ERC1155OperatorEnforcedFactory)
+        .connect(provider)
+      const erc1155OperatorEnforcedBeacon = await erc1155OperatorEnforcedFactory.beacon()
+      const erc1155OperatorEnforcedImplementation = await beacon
+        .attach(erc1155OperatorEnforcedBeacon)
+        .connect(provider)
+        .implementation()
+      await verifyContract(erc1155OperatorEnforcedImplementation, {
+        ...ERC1155OPERATORENFORCEDFACTORY_VERIFICATION,
+        contractToVerify: 'src/tokens/ERC1155/presets/operator-enforced/ERC1155OperatorEnforced.sol:ERC1155OperatorEnforced',
         waitForSuccess
       })
     }
