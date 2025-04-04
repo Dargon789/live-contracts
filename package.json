@@ -15,7 +15,7 @@
     "format": "prettier --write ./**/*.ts"
   },
   "dependencies": {
-    "0xsequence": "^1.2.3",
+    "0xsequence": "^2.2.14",
     "@0xsequence/solidity-deployer": "^0.1.1",
     "@typechain/ethers-v5": "^7.0.1",
     "@typescript-eslint/eslint-plugin": "^8.22.0",
