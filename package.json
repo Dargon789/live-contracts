@@ -26,7 +26,7 @@
     "eslint-plugin-import": "^2.22.0",
     "eslint-plugin-prettier": "^5.2.3",
     "ethers": "^6.13.5",
-    "ora": "^5.4.1",
+    "ora": "^8.2.0",
     "prettier": "^3.0.0",
     "ts-node": "^10.9.1",
     "typescript": "^5.8.2"
