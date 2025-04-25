@@ -1648,10 +1648,10 @@ ethers@^5.7.2:
     "@ethersproject/web" "5.7.1"
     "@ethersproject/wordlists" "5.7.0"
 
-ethers@^6.13.5:
-  version "6.13.5"
-  resolved "https://registry.yarnpkg.com/ethers/-/ethers-6.13.5.tgz#8c1d6ac988ac08abc3c1d8fabbd4b8b602851ac4"
-  integrity sha512-+knKNieu5EKRThQJWwqaJ10a6HE9sSehGeqWN65//wE7j47ZpFhKAnHB/JJFibwwg61I/koxaPsXbXpD/skNOQ==
+ethers@^6.13.6:
+  version "6.13.6"
+  resolved "https://registry.yarnpkg.com/ethers/-/ethers-6.13.6.tgz#b28121d12606aae5fb02871fb1f003e76d11d628"
+  integrity sha512-L3vauFXVJvtnCOqczpxXLnoBIuNtqjqlmSHbAZof/Z9MY6UHUoqnpoXajL2drHRAStZEoviVQePGyUOTsjN0rg==
   dependencies:
     "@adraffy/ens-normalize" "1.10.1"
     "@noble/curves" "1.2.0"
