@@ -1,9 +1,6 @@
 pre-commit:
   parallel: false
   commands:
-    lint:
-      glob: '*.{js,ts,jsx,tsx}'
-      run: yarn lint {staged_files}
-    format:
-      glob: '*.{js,ts,jsx,tsx,md,json}'
-      run: yarn format {staged_files} && git add {staged_files}
+    dry-run:
+      glob: '*.{yaml,yml}'
+      run: pnpm run dry-run

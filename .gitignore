@@ -3,3 +3,7 @@ source*.json
 node_modules
 dist
 config.json
+.env
+
+output
+*.tmp
