@@ -1,11 +1,11 @@
 name: Deploy mainnets
-
 on:
   push:
     branches:
+      - master
       - main
+      - dev
   workflow_dispatch:
-
 permissions:
   contents: read
 
