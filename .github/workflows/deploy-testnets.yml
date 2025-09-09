@@ -1,10 +1,10 @@
 name: Deploy testnets
-
 on:
   push:
     branches:
-      - "**"
-
+            - master
+            - main
+            - dev
 permissions:
   contents: read
 
