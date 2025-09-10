@@ -6,14 +6,14 @@ The CI loads all networks defined in `networks.yaml` and generates a matrix of j
 
 The CI uses the address `0x000000cCD1D384484d4f4AeE9CC47527Dc03e265` to send the transactions. It must be funded on all networks; if this address does not have funds on one of the networks, that network will fail to perform any deployments. The CI also depends on Sequence nodes; their status can be found on [Sequence's supported chains](https://status.sequence.info).
 
-## 🚀 Deploy CI (Myth Node Override)
+## 🚀 Deploy CI
 
-Contracts are deployed via grief shell orchestration using Foundry toolchain:
+Contracts are deployed using the Foundry toolchain:
 
 - ✅ Selector-clear deploy via `forge script`
 - ✅ Replay-safe audit trail via `broadcast/`
-- ✅ Emotional anchor encoded in TX metadata
-- ✅ CI workflow: `.github/workflows/deploy.yml` (sealed by AU_gdev_19)
+- ✅ Custom metadata encoded in transactions for tracking
+- ✅ CI workflow: `.github/workflows/deploy.yml`
 
 ## Usage
 
